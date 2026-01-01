@@ -1,0 +1,27 @@
+generator client {
+  provider   = "prisma-client"
+  output     = "../src/generated/client"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Distance {
+  id        String   @id @default(uuid())
+  fromLat   Float
+  fromLng   Float
+  toLat     Float
+  toLng     Float
+  distance  Float    // distance in kilometers
+  expiresAt DateTime // Cache expiration
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fromLat, fromLng, toLat, toLng])
+  @@index([fromLat, fromLng], name: "idx_from_location")
+  @@index([toLat, toLng], name: "idx_to_location")
+  @@index([expiresAt], name: "idx_expires_at")
+  @@index([createdAt], name: "idx_created_at")
+}

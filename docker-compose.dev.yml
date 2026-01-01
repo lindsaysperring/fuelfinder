@@ -1,0 +1,35 @@
+services:
+  fuelfinder-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: development
+    container_name: fuelfinder-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "file:/app/data/dev.db"
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      MAINTENANCE_KEY: ${MAINTENANCE_KEY:-dev_maintenance_key}
+      NEXT_PUBLIC_HOME_LATITUDE: ${NEXT_PUBLIC_HOME_LATITUDE:--34.9285}
+      NEXT_PUBLIC_HOME_LONGITUDE: ${NEXT_PUBLIC_HOME_LONGITUDE:-138.6007}
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-FuelFinder}
+      NODE_ENV: development
+    volumes:
+      # Mount source code for hot reload
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+      # Persist database
+      - fuelfinder-dev-data:/app/data
+    networks:
+      - fuelfinder-dev-network
+
+volumes:
+  fuelfinder-dev-data:
+    driver: local
+
+networks:
+  fuelfinder-dev-network:
+    driver: bridge

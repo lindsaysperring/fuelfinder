@@ -1,0 +1,48 @@
+services:
+  fuelfinder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fuelfinder-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Database
+      DATABASE_URL: "file:/app/data/prod.db"
+      
+      # Google Maps API - Replace with your actual key
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      
+      # Maintenance key for cron jobs
+      MAINTENANCE_KEY: ${MAINTENANCE_KEY:-your_secret_maintenance_key}
+      
+      # Default Home Location
+      NEXT_PUBLIC_HOME_LATITUDE: ${NEXT_PUBLIC_HOME_LATITUDE:--34.9285}
+      NEXT_PUBLIC_HOME_LONGITUDE: ${NEXT_PUBLIC_HOME_LONGITUDE:-138.6007}
+      
+      # App configuration
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-FuelFinder}
+      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:-*}
+      
+      # Node environment
+      NODE_ENV: production
+    volumes:
+      # Persist SQLite database
+      - fuelfinder-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - fuelfinder-network
+
+volumes:
+  fuelfinder-data:
+    driver: local
+
+networks:
+  fuelfinder-network:
+    driver: bridge
