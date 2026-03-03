@@ -36,6 +36,22 @@ export class GoogleMapsService {
 
       throw new Error('No distance data returned from Google Maps API');
     } catch (error) {
+      if (
+        error !== null &&
+        typeof error === 'object' &&
+        'response' in error &&
+        error.response !== null &&
+        typeof error.response === 'object' &&
+        'data' in error.response
+      ) {
+        const data = error.response.data as { status?: string; error_message?: string } | undefined;
+        const statusCode = 'status' in error.response ? String(error.response.status) : 'unknown';
+        const apiStatus = data?.status ?? statusCode;
+        const apiMessage = data?.error_message ?? (error instanceof Error ? error.message : 'Unknown error');
+        const descriptiveError = new Error(`Google Maps API error (${apiStatus}): ${apiMessage}`);
+        console.error('Error calculating distance:', descriptiveError.message);
+        throw descriptiveError;
+      }
       console.error('Error calculating distance:', error);
       throw error;
     }
