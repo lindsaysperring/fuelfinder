@@ -168,19 +168,32 @@ export default function Home() {
         throw new Error('No station data received');
       }
 
-      const destinations = data.message.list.map((station: Station) => ({
+      // Filter first so destinations and distances arrays share the same indices
+      const filteredStations = data.message.list.filter(
+        (station: Station) =>
+          station.prices[selectedFuelType]?.amount !== undefined
+      );
+
+      if (filteredStations.length === 0) {
+        setStations([]);
+        const uniqueBrands = new Set<string>();
+        for (const station of data.message.list) {
+          if (station.brand) uniqueBrands.add(station.brand);
+        }
+        setAvailableBrands(Array.from(uniqueBrands).sort((a, b) => a.localeCompare(b)));
+        setLastUpdated(new Date());
+        return;
+      }
+
+      const destinations = filteredStations.map((station: Station) => ({
         latitude: station.location.y,
         longitude: station.location.x
       }));
 
       const distances = await calculateDistances(location, destinations);
 
-      const stationsWithDistances = data.message.list
-        .filter((station: Station) => {
-          // Only include stations that have the selected fuel type
-          return station.prices[selectedFuelType]?.amount !== undefined;
-        })
-        .map((station: Station, index: number) => {
+      const stationsWithDistances = filteredStations.map(
+        (station: Station, index: number) => {
           const distance = distances[index];
 
           const fuelPrice = station.prices[selectedFuelType]?.amount || 0;
