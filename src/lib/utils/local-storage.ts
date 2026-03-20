@@ -1,6 +1,7 @@
-import type { UserSettings } from '@/types';
+import type { RouteSettings, UserSettings } from '@/types';
 
 const STORAGE_KEY = 'petrol-finder-settings';
+const ROUTE_STORAGE_KEY = 'petrol-finder-route-settings';
 
 // Check if localStorage is available and functional
 function isLocalStorageAvailable(): boolean {
@@ -64,5 +65,32 @@ export function getSetting<T>(key: keyof UserSettings, defaultValue: T): T {
     return (settings[key] as unknown as T) ?? defaultValue;
   } catch {
     return defaultValue;
+  }
+}
+
+const DEFAULT_ROUTE_SETTINGS: RouteSettings = {
+  start: { type: 'current' },
+  end: { type: 'home' },
+  detourToleranceKm: 5,
+  arriveFullEnabled: false,
+};
+
+export function saveRouteSettings(settings: RouteSettings): void {
+  if (!isLocalStorageAvailable()) return;
+  try {
+    localStorage.setItem(ROUTE_STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // Silent fail
+  }
+}
+
+export function loadRouteSettings(): RouteSettings {
+  if (!isLocalStorageAvailable()) return DEFAULT_ROUTE_SETTINGS;
+  try {
+    const saved = localStorage.getItem(ROUTE_STORAGE_KEY);
+    if (!saved) return DEFAULT_ROUTE_SETTINGS;
+    return { ...DEFAULT_ROUTE_SETTINGS, ...JSON.parse(saved) } as RouteSettings;
+  } catch {
+    return DEFAULT_ROUTE_SETTINGS;
   }
 }

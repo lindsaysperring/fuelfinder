@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -14,6 +15,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { LocationSelector } from '@/components/location-selector';
 import { SavingsCalculator } from '@/components/savings-calculator';
 import { RefreshButton } from '@/components/refresh-button';
+import { RouteTab } from '@/components/route-planner/route-tab';
 import { notifications } from '@/components/notifications';
 import { fetchPetrolStationsAction } from '@/actions/petrolspy-actions';
 import { getHomeCenterAction } from '@/actions/config-actions';
@@ -23,32 +25,7 @@ import type { Coordinates } from '@/lib/utils/distance-cache';
 import { loadSettings, saveSettings } from '@/lib/utils/local-storage';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { DiscountManager } from '@/components/discount-manager';
-import type { BrandDiscount } from '@/types';
-
-interface Station {
-  id: string;
-  name: string;
-  brand: string;
-  address: string;
-  location: {
-    x: number; // longitude
-    y: number; // latitude
-  };
-  prices: {
-    [key: string]: {
-      amount: number;
-      type: string;
-    };
-  };
-}
-
-interface StationWithDistance extends Station {
-  distance: number;
-  travelCost: number;
-  totalCost: number;
-  pricePerLiter: number;
-  discount: number;
-}
+import type { BrandDiscount, Station, StationWithDistance } from '@/types';
 
 const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const SETTINGS_SAVE_DELAY = 1000; // Delay saving settings by 1 second
@@ -87,6 +64,7 @@ export default function Home() {
   );
   const [availableBrands, setAvailableBrands] = useState<string[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [tankSizeLitres, setTankSizeLitres] = useState<number>(50);
 
   // Use the distance calculation hook
   const { calculateDistances } = useDistance();
@@ -124,6 +102,9 @@ export default function Home() {
         setBrandDiscounts(
           savedSettings.brandDiscounts || DEFAULT_SETTINGS.brandDiscounts
         );
+        if (savedSettings.tankSizeLitres) {
+          setTankSizeLitres(savedSettings.tankSizeLitres);
+        }
         notifications.showInfo('Loaded your saved preferences');
       }
     } catch (error) {
@@ -141,7 +122,8 @@ export default function Home() {
           selectedFuelType,
           lastLocation: location,
           fillAmount,
-          brandDiscounts
+          brandDiscounts,
+          tankSizeLitres
         });
         notifications.settingsSaved();
       } catch (error) {
@@ -150,7 +132,7 @@ export default function Home() {
     }, SETTINGS_SAVE_DELAY);
 
     return () => clearTimeout(timeoutId);
-  }, [fuelEconomy, selectedFuelType, location, fillAmount, brandDiscounts]);
+  }, [fuelEconomy, selectedFuelType, location, fillAmount, brandDiscounts, tankSizeLitres]);
 
   const fetchStations = useCallback(async () => {
     setLoading(true);
@@ -349,53 +331,73 @@ export default function Home() {
         </div>
       </div>
 
-      {loading && stations.length === 0 ? (
-        <div className='flex min-h-[200px] items-center justify-center'>
-          <LoadingSpinner />
-        </div>
-      ) : (
-        <div className='grid max-h-[calc(100vh-300px)] grid-cols-1 gap-4 overflow-y-auto p-1 md:grid-cols-2 lg:grid-cols-3'>
-          {stations.length > 0 ? (
-            stations.map((station) => (
-              <Card key={station.id} className='p-4'>
-                <h2 className='mb-2 text-xl font-bold'>{station.name}</h2>
-                <p className='text-muted-foreground mb-2 text-sm'>
-                  {station.address}
-                </p>
-                <div className='space-y-2'>
-                  <p>
-                    Fuel Price: ${station.pricePerLiter.toFixed(3)}/L{' '}
-                    {station.discount > 0 && (
-                      <span className='text-green-600'>
-                        (-${(station.discount / 100).toFixed(2)} discount)
-                      </span>
-                    )}
-                  </p>
-                  <p>Distance: {station.distance.toFixed(1)} km</p>
-                  <p>Travel Cost: ${station.travelCost.toFixed(2)}</p>
-                  <p className='font-bold'>
-                    Total Cost: ${station.totalCost.toFixed(3)}/L
-                  </p>
+      <Tabs defaultValue="nearby">
+        <TabsList className="mb-4 w-full">
+          <TabsTrigger value="nearby" className="flex-1">📍 Nearby Stations</TabsTrigger>
+          <TabsTrigger value="route" className="flex-1">🗺️ Route Planner</TabsTrigger>
+        </TabsList>
 
-                  {closestStation && station.id !== closestStation.id && (
-                    <SavingsCalculator
-                      basePrice={closestStation.totalCost}
-                      bestPrice={station.pricePerLiter}
-                      distance={station.distance}
-                      travelCost={station.travelCost}
-                      averageRefillLiters={fillAmount}
-                    />
-                  )}
-                </div>
-              </Card>
-            ))
+        <TabsContent value="nearby">
+          {loading && stations.length === 0 ? (
+            <div className='flex min-h-[200px] items-center justify-center'>
+              <LoadingSpinner />
+            </div>
           ) : (
-            <div className='text-muted-foreground col-span-full text-center'>
-              No stations found with the selected fuel type.
+            <div className='grid max-h-[calc(100vh-300px)] grid-cols-1 gap-4 overflow-y-auto p-1 md:grid-cols-2 lg:grid-cols-3'>
+              {stations.length > 0 ? (
+                stations.map((station) => (
+                  <Card key={station.id} className='p-4'>
+                    <h2 className='mb-2 text-xl font-bold'>{station.name}</h2>
+                    <p className='text-muted-foreground mb-2 text-sm'>
+                      {station.address}
+                    </p>
+                    <div className='space-y-2'>
+                      <p>
+                        Fuel Price: ${station.pricePerLiter.toFixed(3)}/L{' '}
+                        {station.discount > 0 && (
+                          <span className='text-green-600'>
+                            (-${(station.discount / 100).toFixed(2)} discount)
+                          </span>
+                        )}
+                      </p>
+                      <p>Distance: {station.distance.toFixed(1)} km</p>
+                      <p>Travel Cost: ${station.travelCost.toFixed(2)}</p>
+                      <p className='font-bold'>
+                        Total Cost: ${station.totalCost.toFixed(3)}/L
+                      </p>
+
+                      {closestStation && station.id !== closestStation.id && (
+                        <SavingsCalculator
+                          basePrice={closestStation.totalCost}
+                          bestPrice={station.pricePerLiter}
+                          distance={station.distance}
+                          travelCost={station.travelCost}
+                          averageRefillLiters={fillAmount}
+                        />
+                      )}
+                    </div>
+                  </Card>
+                ))
+              ) : (
+                <div className='text-muted-foreground col-span-full text-center'>
+                  No stations found with the selected fuel type.
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
+        </TabsContent>
+
+        <TabsContent value="route">
+          <RouteTab
+            fuelEconomy={fuelEconomy}
+            selectedFuelType={selectedFuelType}
+            fillAmount={fillAmount}
+            tankSizeLitres={tankSizeLitres}
+            onTankSizeChange={setTankSizeLitres}
+            brandDiscounts={brandDiscounts}
+          />
+        </TabsContent>
+      </Tabs>
     </main>
   );
 }
