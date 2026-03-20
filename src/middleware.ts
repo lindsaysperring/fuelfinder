@@ -7,10 +7,11 @@ export function middleware(request: NextRequest) {
 
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''};
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''} https://maps.googleapis.com;
     style-src 'self' 'unsafe-inline';
-    img-src 'self' blob: data:;
-    font-src 'self';
+    img-src 'self' blob: data: https://maps.gstatic.com https://maps.googleapis.com;
+    font-src 'self' https://fonts.gstatic.com;
+    connect-src 'self' https://maps.googleapis.com https://maps.gstatic.com;
     object-src 'none';
     base-uri 'self';
     form-action 'self';
