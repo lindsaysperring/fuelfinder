@@ -7,14 +7,17 @@ export function middleware(request: NextRequest) {
 
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''};
-    style-src 'self' 'unsafe-inline';
-    img-src 'self' blob: data:;
-    font-src 'self';
+    script-src 'self' 'nonce-${nonce}' https://*.googleapis.com https://*.gstatic.com ${isDev ? "'unsafe-eval'" : ''};
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.gstatic.com;
+    img-src 'self' blob: data: https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com;
+    font-src 'self' https://fonts.gstatic.com;
+    connect-src 'self' https://*.googleapis.com https://*.gstatic.com https://*.google.com;
+    worker-src 'self' blob:;
     object-src 'none';
     base-uri 'self';
     form-action 'self';
     frame-ancestors 'none';
+    frame-src https://www.google.com https://maps.googleapis.com;
     upgrade-insecure-requests;
   `.replaceAll(/\s{2,}/g, ' ').trim();
 

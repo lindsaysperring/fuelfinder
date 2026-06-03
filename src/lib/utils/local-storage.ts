@@ -1,4 +1,4 @@
-import type { UserSettings } from '@/types';
+import type { UserSettings, SearchTab } from '@/types';
 
 const STORAGE_KEY = 'petrol-finder-settings';
 
@@ -64,5 +64,28 @@ export function getSetting<T>(key: keyof UserSettings, defaultValue: T): T {
     return (settings[key] as unknown as T) ?? defaultValue;
   } catch {
     return defaultValue;
+  }
+}
+
+export function saveActiveTab(tab: SearchTab): void {
+  if (!isLocalStorageAvailable()) return;
+  try {
+    const settings = loadSettings();
+    if (settings) {
+      settings.activeTab = tab;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    }
+  } catch {
+    // Silent fail
+  }
+}
+
+export function loadActiveTab(): SearchTab {
+  if (!isLocalStorageAvailable()) return 'nearby';
+  try {
+    const settings = loadSettings();
+    return settings?.activeTab ?? 'nearby';
+  } catch {
+    return 'nearby';
   }
 }

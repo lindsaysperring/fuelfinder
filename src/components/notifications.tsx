@@ -41,5 +41,23 @@ export const notifications = {
     toast.success('Settings saved', {
       description: 'Your preferences will be remembered'
     });
+  },
+
+  routeSearchComplete: (stationCount: number) => {
+    toast.success('Route search complete', {
+      description: `Found ${stationCount} station${stationCount === 1 ? '' : 's'} along your route`
+    });
+  },
+
+  routeSearchError: () => {
+    toast.error('Failed to search along route', {
+      description: 'Please check your origin and destination and try again'
+    });
+  },
+
+  routeNotFound: () => {
+    toast.error('No route found', {
+      description: 'Could not find a route between the specified locations'
+    });
   }
 };

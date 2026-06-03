@@ -3,26 +3,26 @@
 # Prisma client is generated at runtime using 'pnpm dlx' to avoid copying all node_modules
 
 # Stage 1: Dependencies
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 RUN apk add --no-cache libc6-compat openssl
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@11.5.0 --activate
 
 WORKDIR /app
 
 # Copy package files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
 # Stage 2: Builder
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 RUN apk add --no-cache libc6-compat openssl
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@11.5.0 --activate
 
 WORKDIR /app
 
@@ -49,12 +49,12 @@ ENV NEXT_PUBLIC_VERSION=${VERSION}
 RUN pnpm build
 
 # Stage 3: Runner
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 # Install dependencies and pnpm
 RUN apk add --no-cache openssl && \
     corepack enable && \
-    corepack prepare pnpm@latest --activate
+    corepack prepare pnpm@11.5.0 --activate
 
 WORKDIR /app
 
