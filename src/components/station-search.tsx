@@ -42,27 +42,27 @@ interface StationWithDistance extends Station {
 
 const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
 
-const FALLBACK_LOCATION: Coordinates = {
-  latitude: -34.9285,
-  longitude: 138.6007
-};
-
 interface StationSearchProps {
   fuelEconomy: number;
   selectedFuelType: string;
   fillAmount: number;
   brandDiscounts: BrandDiscount[];
+  location: Coordinates;
+  onLocationChange: (location: Coordinates) => void;
+  onBrandsChange?: (brands: string[]) => void;
 }
 
 export function StationSearch({
   fuelEconomy,
   selectedFuelType,
   fillAmount,
-  brandDiscounts
+  brandDiscounts,
+  location,
+  onLocationChange,
+  onBrandsChange
 }: StationSearchProps) {
   const [stations, setStations] = useState<StationWithDistance[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [location, setLocation] = useState<Coordinates>(FALLBACK_LOCATION);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const { calculateDistances } = useDistance();
@@ -72,13 +72,13 @@ export function StationSearch({
       const result = await getHomeCenterAction();
       if (result.success) {
         const savedSettings = loadSettings();
-        if (!savedSettings?.lastLocation || savedSettings.lastLocation === FALLBACK_LOCATION) {
-          setLocation(result.data);
+        if (!savedSettings?.lastLocation) {
+          onLocationChange(result.data);
         }
       }
     };
     initializeHomeCenter();
-  }, []);
+  }, [onLocationChange]);
 
   const fetchStations = useCallback(async () => {
     setLoading(true);
@@ -143,6 +143,14 @@ export function StationSearch({
       );
       setStations(sortedStations);
 
+      if (onBrandsChange) {
+        const brands = new Set<string>();
+        for (const s of filteredStations) {
+          if (s.brand) brands.add(s.brand);
+        }
+        onBrandsChange(Array.from(brands).sort());
+      }
+
       setLastUpdated(new Date());
       notifications.pricesUpdated();
     } catch (error) {
@@ -151,7 +159,7 @@ export function StationSearch({
     } finally {
       setLoading(false);
     }
-  }, [location, fuelEconomy, selectedFuelType, fillAmount, brandDiscounts, calculateDistances]);
+  }, [location, fuelEconomy, selectedFuelType, fillAmount, brandDiscounts, calculateDistances, onBrandsChange]);
 
   useEffect(() => {
     fetchStations();
@@ -177,7 +185,7 @@ export function StationSearch({
         />
       </div>
 
-      <LocationSelector onLocationChange={setLocation} />
+      <LocationSelector onLocationChange={onLocationChange} />
 
       {loading && stations.length === 0 ? (
         <div className='flex min-h-[200px] items-center justify-center'>

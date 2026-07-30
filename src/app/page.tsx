@@ -15,7 +15,7 @@ import { DiscountManager } from '@/components/discount-manager';
 import { StationSearch } from '@/components/station-search';
 import { RouteFinder } from '@/components/route-finder';
 import { loadSettings, saveSettings } from '@/lib/utils/local-storage';
-import type { BrandDiscount, SearchTab } from '@/types';
+import type { BrandDiscount, Coordinates, SearchTab } from '@/types';
 
 const SETTINGS_SAVE_DELAY = 1000;
 
@@ -25,9 +25,12 @@ const DEFAULT_SETTINGS = {
   fillAmount: 40,
   brandDiscounts: [
     { brand: 'AMPOL', discount: 8 },
-    { brand: 'CALTEX', discount: 10 }
+    { brand: 'CALTEX', discount: 10 },
+    { brand: 'ONTHERUN', discount: 2 }
   ]
 };
+
+const DEFAULT_LOCATION: Coordinates = { latitude: -34.9285, longitude: 138.6007 };
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<SearchTab>('nearby');
@@ -35,6 +38,8 @@ export default function Home() {
   const [selectedFuelType, setSelectedFuelType] = useState<string>(DEFAULT_SETTINGS.selectedFuelType);
   const [fillAmount, setFillAmount] = useState<number>(DEFAULT_SETTINGS.fillAmount);
   const [brandDiscounts, setBrandDiscounts] = useState<BrandDiscount[]>(DEFAULT_SETTINGS.brandDiscounts);
+  const [location, setLocation] = useState<Coordinates>(DEFAULT_LOCATION);
+  const [availableBrands, setAvailableBrands] = useState<string[]>([]);
 
   useEffect(() => {
     try {
@@ -45,6 +50,11 @@ export default function Home() {
         if (saved.fillAmount) setFillAmount(saved.fillAmount);
         if (saved.brandDiscounts) setBrandDiscounts(saved.brandDiscounts);
         if (saved.activeTab) setActiveTab(saved.activeTab as SearchTab);
+        if (saved.lastLocation &&
+            (saved.lastLocation.latitude !== DEFAULT_LOCATION.latitude ||
+             saved.lastLocation.longitude !== DEFAULT_LOCATION.longitude)) {
+          setLocation(saved.lastLocation);
+        }
         notifications.showInfo('Loaded your saved preferences');
       }
     } catch {
@@ -58,7 +68,7 @@ export default function Home() {
         saveSettings({
           fuelEconomy,
           selectedFuelType,
-          lastLocation: { latitude: -34.9285, longitude: 138.6007 },
+          lastLocation: location,
           fillAmount,
           brandDiscounts,
           activeTab
@@ -70,7 +80,7 @@ export default function Home() {
     }, SETTINGS_SAVE_DELAY);
 
     return () => clearTimeout(timeoutId);
-  }, [fuelEconomy, selectedFuelType, fillAmount, brandDiscounts, activeTab]);
+  }, [fuelEconomy, selectedFuelType, fillAmount, brandDiscounts, activeTab, location]);
 
   const handleTabChange = (tab: SearchTab) => {
     setActiveTab(tab);
@@ -166,7 +176,7 @@ export default function Home() {
             <DiscountManager
               discounts={brandDiscounts}
               onDiscountsChange={setBrandDiscounts}
-              availableBrands={[]}
+              availableBrands={availableBrands}
             />
           </div>
         )}
@@ -178,6 +188,9 @@ export default function Home() {
           selectedFuelType={selectedFuelType}
           fillAmount={fillAmount}
           brandDiscounts={brandDiscounts}
+          location={location}
+          onLocationChange={setLocation}
+          onBrandsChange={setAvailableBrands}
         />
       )}
 
