@@ -1,21 +1,43 @@
 #!/usr/bin/env pwsh
-# Build Docker image with version tagging locally
+# Build Docker image with version tagging using Nerdbank.GitVersioning (nbgv)
 
 param(
     [string]$Version,
     [string]$Registry = "fuelfinder",
+    [string]$GoogleMapsApiKey,
     [switch]$Push,
     [switch]$Latest
 )
 
-# Get version from git if not provided
+# Get version from nbgv if not provided
 if (-not $Version) {
-    $gitTag = git describe --tags --exact-match 2>$null
-    if ($gitTag) {
-        $Version = $gitTag
-    } else {
-        $Version = "dev-$(git rev-parse --short HEAD)"
+    try {
+        $nbgvJson = npx nbgv get-version --format json 2>$null
+        $nbgv = $nbgvJson | ConvertFrom-Json
+
+        if ($nbgv.SemVer2) {
+            $Version = $nbgv.SemVer2
+            Write-Host "📌 Version from nbgv: $Version" -ForegroundColor Green
+        } else {
+            throw "nbgv returned no SemVer2"
+        }
+    } catch {
+        Write-Host "⚠️  nbgv failed, falling back to git describe" -ForegroundColor Yellow
+        $gitTag = git describe --tags --exact-match 2>$null
+        if ($gitTag) {
+            $Version = $gitTag
+        } else {
+            $Version = "dev-$(git rev-parse --short HEAD)"
+        }
     }
+}
+
+if (-not $GoogleMapsApiKey) {
+    $GoogleMapsApiKey = $env:NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+}
+
+if (-not $GoogleMapsApiKey) {
+    Write-Host "⚠️  NEXT_PUBLIC_GOOGLE_MAPS_API_KEY not set. Pass -GoogleMapsApiKey or set the NEXT_PUBLIC_GOOGLE_MAPS_API_KEY env var." -ForegroundColor Yellow
 }
 
 $buildDate = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ" -AsUTC
@@ -49,6 +71,7 @@ docker build `
     --build-arg BUILD_DATE=$buildDate `
     --build-arg VCS_REF=$vcsRef `
     --build-arg VCS_URL=$vcsUrl `
+    --build-arg NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=$GoogleMapsApiKey `
     @tagArgs `
     .
 

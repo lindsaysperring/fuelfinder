@@ -117,6 +117,9 @@ importers:
       jsdom:
         specifier: ^27.1.0
         version: 27.4.0
+      nerdbank-gitversioning:
+        specifier: ^3.10.91
+        version: 3.10.91
       tailwindcss:
         specifier: ^4
         version: 4.3.0
@@ -3001,6 +3004,10 @@ packages:
 
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
+
+  nerdbank-gitversioning@3.10.91:
+    resolution: {integrity: sha512-uECx6ljRpnU7vWMJmhKnyl8Zn0LAtA6TLZETLmsZ8QQiBAKiGcxZayzmoRkutOzMnQCDf/pr08Bpy0kFBQ3a9g==}
+    hasBin: true
 
   next-themes@0.4.6:
     resolution: {integrity: sha512-pZvgD5L0IEvX5/9GWyHMf3m8BKiVQwsCMHfoFosXtXBMnaS0ZnIJ9ST4b4NqLVKDEm8QBxoNNGNaBv2JNF6XNA==}
@@ -6707,6 +6714,8 @@ snapshots:
   napi-postinstall@0.3.4: {}
 
   natural-compare@1.4.0: {}
+
+  nerdbank-gitversioning@3.10.91: {}
 
   next-themes@0.4.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0):
     dependencies:
