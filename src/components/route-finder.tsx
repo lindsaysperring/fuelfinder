@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -38,6 +39,10 @@ interface RouteFinderProps {
   setFillAmount: (v: number) => void;
   brandDiscounts: BrandDiscount[];
   setBrandDiscounts: (v: BrandDiscount[]) => void;
+  maxDestDistanceKm: number | undefined;
+  setMaxDestDistanceKm: (v: number | undefined) => void;
+  avoidTolls: boolean;
+  setAvoidTolls: (v: boolean) => void;
 }
 
 export function RouteFinder({
@@ -48,7 +53,11 @@ export function RouteFinder({
   fillAmount,
   setFillAmount,
   brandDiscounts,
-  setBrandDiscounts
+  setBrandDiscounts,
+  maxDestDistanceKm,
+  setMaxDestDistanceKm,
+  avoidTolls,
+  setAvoidTolls
 }: RouteFinderProps) {
   const { isLoaded, loadError } = useGoogleMaps();
   const [origin, setOrigin] = useState<AddressLocation | null>(null);
@@ -79,7 +88,9 @@ export function RouteFinder({
         fuelType: selectedFuelType,
         fuelEconomy,
         fillAmount,
-        brandDiscounts
+        brandDiscounts,
+        maxDestDistanceKm,
+        avoidTolls
       });
 
       if (!result.success) {
@@ -108,7 +119,7 @@ export function RouteFinder({
     } finally {
       setLoading(false);
     }
-  }, [origin, destination, selectedFuelType, fuelEconomy, fillAmount, brandDiscounts]);
+  }, [origin, destination, selectedFuelType, fuelEconomy, fillAmount, brandDiscounts, maxDestDistanceKm, avoidTolls]);
 
   const handleStationClick = useCallback((stationId: string) => {
     setActiveStationId(stationId);
@@ -283,7 +294,7 @@ export function RouteFinder({
         </div>
       </div>
 
-      <div className='grid grid-cols-1 gap-4 md:grid-cols-4'>
+      <div className='grid grid-cols-1 gap-4 md:grid-cols-5'>
         <div>
           <label className='mb-2 block text-sm font-medium'>
             Fuel Economy (L/100km)
@@ -313,6 +324,22 @@ export function RouteFinder({
         </div>
         <div>
           <label className='mb-2 block text-sm font-medium'>
+            Max distance from destination (km)
+          </label>
+          <Input
+            type='number'
+            value={maxDestDistanceKm ?? ''}
+            onChange={(e) => {
+              const v = e.target.value === '' ? undefined : Number(e.target.value);
+              setMaxDestDistanceKm(v !== undefined && v > 0 ? v : undefined);
+            }}
+            min='0'
+            step='1'
+            placeholder='No limit'
+          />
+        </div>
+        <div>
+          <label className='mb-2 block text-sm font-medium'>
             Fill Amount (Liters)
           </label>
           <Input
@@ -332,6 +359,17 @@ export function RouteFinder({
             {loading ? <LoadingSpinner /> : 'Find Stations Along Route'}
           </Button>
         </div>
+      </div>
+
+      <div className='flex items-center gap-2'>
+        <Switch
+          checked={avoidTolls}
+          onCheckedChange={setAvoidTolls}
+          id='avoid-tolls'
+        />
+        <label htmlFor='avoid-tolls' className='text-sm font-medium'>
+          Avoid tolls
+        </label>
       </div>
 
       <DiscountManager
@@ -372,6 +410,7 @@ export function RouteFinder({
             sortMode={sortMode}
             onSortModeChange={setSortMode}
             activeStationId={activeStationId}
+            maxDestDistanceKm={maxDestDistanceKm}
           />
         </div>
       )}

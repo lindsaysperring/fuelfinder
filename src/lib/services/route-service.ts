@@ -1,4 +1,18 @@
-import { Client, TravelMode } from '@googlemaps/google-maps-services-js';
+import {
+  Client,
+  LatLng,
+  TravelMode,
+  TravelRestriction
+} from '@googlemaps/google-maps-services-js';
+
+interface DirectionsParams {
+  origin: LatLng;
+  destination: LatLng;
+  mode: TravelMode;
+  key: string;
+  waypoints?: LatLng[];
+  avoid?: TravelRestriction[];
+}
 
 export interface Coordinates {
   latitude: number;
@@ -26,6 +40,20 @@ interface DirectionsError {
   };
 }
 
+export function computeDetourAndDistanceKm(
+  legs: Array<{ distance: { value: number } }>,
+  originalDistanceKm: number
+): { detourKm: number; distanceToDestinationKm: number } {
+  const waypointDistanceKm =
+    legs.reduce((sum, leg) => sum + leg.distance.value, 0) / 1000;
+  const lastLeg = legs[legs.length - 1];
+  const distanceToDestinationKm = lastLeg ? lastLeg.distance.value / 1000 : 0;
+  return {
+    detourKm: Math.max(0, waypointDistanceKm - originalDistanceKm),
+    distanceToDestinationKm
+  };
+}
+
 export class RouteService {
   private static client: Client | null = null;
   private static apiKey: string | null = null;
@@ -43,18 +71,19 @@ export class RouteService {
 
   static async getRoute(
     origin: Coordinates,
-    destination: Coordinates
+    destination: Coordinates,
+    avoidTolls: boolean
   ): Promise<RouteResult | null> {
     try {
       const client = this.getClient();
-      const response = await client.directions({
-        params: {
-          origin: { lat: origin.latitude, lng: origin.longitude },
-          destination: { lat: destination.latitude, lng: destination.longitude },
-          mode: TravelMode.driving,
-          key: this.apiKey!
-        }
-      });
+      const params: DirectionsParams = {
+        origin: { lat: origin.latitude, lng: origin.longitude },
+        destination: { lat: destination.latitude, lng: destination.longitude },
+        mode: TravelMode.driving,
+        key: this.apiKey!
+      };
+      if (avoidTolls) params.avoid = [TravelRestriction.tolls];
+      const response = await client.directions({ params });
 
       if (response.data.status === 'ZERO_RESULTS' || !response.data.routes?.length) {
         return null;
@@ -84,53 +113,33 @@ export class RouteService {
     }
   }
 
-  static async getExactDetour(
+  static async getStationRoute(
     origin: Coordinates,
     station: Coordinates,
-    destination: Coordinates
-  ): Promise<number | null> {
+    destination: Coordinates,
+    originalDistanceKm: number,
+    avoidTolls: boolean
+  ): Promise<{ detourKm: number; distanceToDestinationKm: number } | null> {
     try {
       const client = this.getClient();
-      const [originalRoute, waypointRoute] = await Promise.all([
-        client.directions({
-          params: {
-            origin: { lat: origin.latitude, lng: origin.longitude },
-            destination: { lat: destination.latitude, lng: destination.longitude },
-            mode: TravelMode.driving,
-            key: this.apiKey!
-          }
-        }),
-        client.directions({
-          params: {
-            origin: { lat: origin.latitude, lng: origin.longitude },
-            destination: { lat: destination.latitude, lng: destination.longitude },
-            waypoints: [{ lat: station.latitude, lng: station.longitude }],
-            mode: TravelMode.driving,
-            key: this.apiKey!
-          }
-        })
-      ]);
+      const params: DirectionsParams = {
+        origin: { lat: origin.latitude, lng: origin.longitude },
+        destination: { lat: destination.latitude, lng: destination.longitude },
+        waypoints: [{ lat: station.latitude, lng: station.longitude }],
+        mode: TravelMode.driving,
+        key: this.apiKey!
+      };
+      if (avoidTolls) params.avoid = [TravelRestriction.tolls];
+      const waypointRoute = await client.directions({ params });
 
-      if (
-        !originalRoute.data.routes?.length ||
-        !waypointRoute.data.routes?.length
-      ) {
+      if (!waypointRoute.data.routes?.length) {
         return null;
       }
 
-      const originalDistance =
-        originalRoute.data.routes[0].legs.reduce(
-          (sum, leg) => sum + leg.distance.value,
-          0
-        ) / 1000;
-
-      const waypointDistance =
-        waypointRoute.data.routes[0].legs.reduce(
-          (sum, leg) => sum + leg.distance.value,
-          0
-        ) / 1000;
-
-      return waypointDistance - originalDistance;
+      return computeDetourAndDistanceKm(
+        waypointRoute.data.routes[0].legs,
+        originalDistanceKm
+      );
     } catch (error) {
       const apiError = error as DirectionsError;
       if (apiError?.response?.data) {

@@ -61,6 +61,8 @@ export interface UserSettings {
   selectedFuelType: string;
   lastLocation: Coordinates;
   fillAmount: number;
+  maxDestDistanceKm?: number;
+  avoidTolls?: boolean;
   brandDiscounts: BrandDiscount[];
   activeTab?: SearchTab;
 }

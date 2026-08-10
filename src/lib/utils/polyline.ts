@@ -40,7 +40,7 @@ function toRadians(degrees: number): number {
   return (degrees * Math.PI) / 180;
 }
 
-function haversineDistance(
+export function haversineDistance(
   p1: { lat: number; lng: number },
   p2: { lat: number; lng: number }
   ): number {

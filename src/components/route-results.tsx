@@ -12,13 +12,15 @@ interface RouteResultsProps {
   sortMode: SortMode;
   onSortModeChange: (mode: SortMode) => void;
   activeStationId: string | null;
+  maxDestDistanceKm?: number;
 }
 
 export function RouteResults({
   stations,
   sortMode,
   onSortModeChange,
-  activeStationId
+  activeStationId,
+  maxDestDistanceKm
 }: RouteResultsProps) {
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -46,7 +48,9 @@ export function RouteResults({
   if (stations.length === 0) {
     return (
       <div className='text-muted-foreground py-8 text-center'>
-        No stations found within 3 km of your route.
+        {maxDestDistanceKm
+          ? `No stations found within 3 km of your route and ${maxDestDistanceKm} km of your destination.`
+          : 'No stations found within 3 km of your route.'}
       </div>
     );
   }

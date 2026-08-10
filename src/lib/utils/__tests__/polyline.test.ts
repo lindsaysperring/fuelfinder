@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { decodePolyline, pointToSegmentDistance, minDistanceToRoute } from '../polyline';
+import { decodePolyline, pointToSegmentDistance, minDistanceToRoute, haversineDistance } from '../polyline';
 
 describe('decodePolyline', () => {
   it('should decode a simple polyline', () => {
@@ -117,5 +117,26 @@ describe('minDistanceToRoute', () => {
     const point = { lat: -34.91, lng: 138.505 };
     const dist = minDistanceToRoute(point, route);
     expect(dist).toBeLessThan(2);
+  });
+});
+
+describe('haversineDistance', () => {
+  it('returns 0 for identical points', () => {
+    const p = { lat: -34.9285, lng: 138.6007 };
+    expect(haversineDistance(p, p)).toBe(0);
+  });
+
+  it('computes the known Sydney-Melbourne distance', () => {
+    const sydney = { lat: -33.8688, lng: 151.2093 };
+    const melbourne = { lat: -37.8136, lng: 144.9631 };
+    const km = haversineDistance(sydney, melbourne);
+    expect(km).toBeGreaterThan(700);
+    expect(km).toBeLessThan(730);
+  });
+
+  it('is symmetric', () => {
+    const a = { lat: -34.0, lng: 138.0 };
+    const b = { lat: -35.5, lng: 139.5 };
+    expect(haversineDistance(a, b)).toBeCloseTo(haversineDistance(b, a), 5);
   });
 });

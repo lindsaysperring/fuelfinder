@@ -38,6 +38,8 @@ export default function Home() {
   const [selectedFuelType, setSelectedFuelType] = useState<string>(DEFAULT_SETTINGS.selectedFuelType);
   const [fillAmount, setFillAmount] = useState<number>(DEFAULT_SETTINGS.fillAmount);
   const [brandDiscounts, setBrandDiscounts] = useState<BrandDiscount[]>(DEFAULT_SETTINGS.brandDiscounts);
+  const [maxDestDistanceKm, setMaxDestDistanceKm] = useState<number | undefined>(undefined);
+  const [avoidTolls, setAvoidTolls] = useState<boolean>(true);
   const [location, setLocation] = useState<Coordinates>(DEFAULT_LOCATION);
   const [availableBrands, setAvailableBrands] = useState<string[]>([]);
 
@@ -48,6 +50,8 @@ export default function Home() {
         if (saved.fuelEconomy) setFuelEconomy(saved.fuelEconomy);
         if (saved.selectedFuelType) setSelectedFuelType(saved.selectedFuelType);
         if (saved.fillAmount) setFillAmount(saved.fillAmount);
+        if (saved.maxDestDistanceKm) setMaxDestDistanceKm(saved.maxDestDistanceKm);
+        if (saved.avoidTolls !== undefined) setAvoidTolls(saved.avoidTolls);
         if (saved.brandDiscounts) setBrandDiscounts(saved.brandDiscounts);
         if (saved.activeTab) setActiveTab(saved.activeTab as SearchTab);
         if (saved.lastLocation &&
@@ -70,6 +74,8 @@ export default function Home() {
           selectedFuelType,
           lastLocation: location,
           fillAmount,
+          maxDestDistanceKm,
+          avoidTolls,
           brandDiscounts,
           activeTab
         });
@@ -80,7 +86,7 @@ export default function Home() {
     }, SETTINGS_SAVE_DELAY);
 
     return () => clearTimeout(timeoutId);
-  }, [fuelEconomy, selectedFuelType, fillAmount, brandDiscounts, activeTab, location]);
+  }, [fuelEconomy, selectedFuelType, fillAmount, brandDiscounts, activeTab, location, maxDestDistanceKm, avoidTolls]);
 
   const handleTabChange = (tab: SearchTab) => {
     setActiveTab(tab);
@@ -204,6 +210,10 @@ export default function Home() {
           setFillAmount={setFillAmount}
           brandDiscounts={brandDiscounts}
           setBrandDiscounts={setBrandDiscounts}
+          maxDestDistanceKm={maxDestDistanceKm}
+          setMaxDestDistanceKm={setMaxDestDistanceKm}
+          avoidTolls={avoidTolls}
+          setAvoidTolls={setAvoidTolls}
         />
       )}
     </main>

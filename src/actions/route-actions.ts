@@ -5,7 +5,7 @@ import { actionWrapper } from '@/lib/utils/action-wrapper';
 import { checkRateLimit, getRateLimitIdentifier } from '@/lib/utils/rate-limit';
 import { RouteService } from '@/lib/services/route-service';
 import { fetchPetrolStationsAction } from '@/actions/petrolspy-actions';
-import { decodePolyline, minDistanceToRoute } from '@/lib/utils/polyline';
+import { decodePolyline, haversineDistance, minDistanceToRoute } from '@/lib/utils/polyline';
 import { calculateBoundingBox } from '@/lib/utils/config';
 import type { BrandDiscount } from '@/types';
 
@@ -25,7 +25,9 @@ const routeSearchSchema = z.object({
   fuelType: z.string().min(1),
   fuelEconomy: z.number().min(0),
   fillAmount: z.number().min(0),
-  brandDiscounts: z.array(brandDiscountSchema).default([])
+  brandDiscounts: z.array(brandDiscountSchema).default([]),
+  maxDestDistanceKm: z.number().min(0).optional(),
+  avoidTolls: z.boolean().default(true)
 });
 
 interface RouteStationResult {
@@ -52,7 +54,17 @@ interface RouteSearchResult {
   stations: RouteStationResult[];
 }
 
-export async function searchAlongRouteAction(input: z.infer<typeof routeSearchSchema>) {
+async function mapInChunks<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  for (let i = 0; i < items.length; i += size) {
+    const chunk = items.slice(i, i + size);
+    const chunkResults = await Promise.all(chunk.map(fn));
+    chunkResults.forEach((r, j) => { results[i + j] = r; });
+  }
+  return results;
+}
+
+export async function searchAlongRouteAction(input: z.input<typeof routeSearchSchema>) {
   return actionWrapper<RouteSearchResult>(async () => {
     const identifier = await getRateLimitIdentifier();
     const allowed = await checkRateLimit(identifier, 20, 60000);
@@ -61,12 +73,17 @@ export async function searchAlongRouteAction(input: z.infer<typeof routeSearchSc
     }
 
     const validated = routeSearchSchema.parse(input);
-    const { origin, destination, fuelType, fuelEconomy, fillAmount, brandDiscounts } = validated;
+    const { origin, destination, fuelType, fuelEconomy, fillAmount, brandDiscounts, maxDestDistanceKm, avoidTolls } = validated;
 
-    const route = await RouteService.getRoute(origin, destination);
+    const route = await RouteService.getRoute(origin, destination, avoidTolls);
     if (!route) {
       throw new Error('No route found between the specified locations');
     }
+
+    const maxDestFilter = maxDestDistanceKm ?? 0;
+    const filterEnabled = maxDestFilter > 0;
+    const originalDistanceKm = route.distance;
+    const destinationPoint = { lat: destination.latitude, lng: destination.longitude };
 
     const routeBounds = route.bounds;
     const centerLat = (routeBounds.neLat + routeBounds.swLat) / 2;
@@ -104,6 +121,8 @@ export async function searchAlongRouteAction(input: z.infer<typeof routeSearchSc
 
       if (distToRoute > 3) continue;
 
+      if (filterEnabled && haversineDistance(stationPoint, destinationPoint) > maxDestFilter) continue;
+
       const approxDetour = 2 * distToRoute;
       const travelCost = (approxDetour * fuelEconomy * pricePerLiter) / 100;
       const totalCost = (pricePerLiter * fillAmount + travelCost) / fillAmount;
@@ -124,35 +143,44 @@ export async function searchAlongRouteAction(input: z.infer<typeof routeSearchSc
     }
 
     stationsWithDetour.sort((a, b) => a.totalCost - b.totalCost);
-    const top10 = stationsWithDetour.slice(0, 10);
 
-    const exactDetourResults = await Promise.all(
-      top10.map(async (s) => {
-        try {
-          const detour = await RouteService.getExactDetour(
-            origin,
-            { latitude: s.location.lat, longitude: s.location.lng },
-            destination
-          );
-          return { id: s.id, detour };
-        } catch {
-          return { id: s.id, detour: null };
-        }
-      })
-    );
+    const candidatePool = filterEnabled
+      ? stationsWithDetour
+      : stationsWithDetour.slice(0, 10);
 
-    const detourMap = new Map(exactDetourResults.map(r => [r.id, r.detour]));
-
-    for (const s of top10) {
-      const exactDetour = detourMap.get(s.id);
-      if (exactDetour !== undefined && exactDetour !== null) {
-        s.exactDetour = exactDetour;
-        s.travelCost = (exactDetour * fuelEconomy * s.pricePerLiter) / 100;
-        s.totalCost = (s.pricePerLiter * fillAmount + s.travelCost) / fillAmount;
+    const exactResults = await mapInChunks(candidatePool, 5, async (s) => {
+      try {
+        const info = await RouteService.getStationRoute(
+          origin,
+          { latitude: s.location.lat, longitude: s.location.lng },
+          destination,
+          originalDistanceKm,
+          avoidTolls
+        );
+        return { id: s.id, info };
+      } catch {
+        return { id: s.id, info: null };
       }
+    });
+
+    const infoMap = new Map(exactResults.map(r => [r.id, r.info]));
+
+    const finalCandidates: RouteStationResult[] = [];
+    for (const s of candidatePool) {
+      const info = infoMap.get(s.id);
+      if (!info) {
+        if (!filterEnabled) finalCandidates.push(s);
+        continue;
+      }
+      if (filterEnabled && info.distanceToDestinationKm > maxDestFilter) continue;
+      s.exactDetour = info.detourKm;
+      s.travelCost = (info.detourKm * fuelEconomy * s.pricePerLiter) / 100;
+      s.totalCost = (s.pricePerLiter * fillAmount + s.travelCost) / fillAmount;
+      finalCandidates.push(s);
     }
 
-    top10.sort((a, b) => a.totalCost - b.totalCost);
+    finalCandidates.sort((a, b) => a.totalCost - b.totalCost);
+    const top10 = finalCandidates.slice(0, 10);
 
     return {
       route: {
