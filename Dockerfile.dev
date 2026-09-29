@@ -4,7 +4,7 @@ FROM node:20-alpine AS development
 # Install dependencies and pnpm
 RUN apk add --no-cache libc6-compat openssl && \
     corepack enable && \
-    corepack prepare pnpm@latest --activate
+    corepack prepare pnpm@11.5.0 --activate
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 
 # Install dependencies
-RUN pnpm install
+RUN pnpm install --frozen-lockfile
 
 # Copy prisma schema
 COPY prisma ./prisma/

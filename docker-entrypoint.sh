@@ -1,16 +1,27 @@
 #!/bin/sh
-set -e
+set -eu
 
 echo "🚀 Starting FuelFinder application..."
 
-# Ensure DATABASE_URL is set, use default if not provided
-export DATABASE_URL="${DATABASE_URL:-file:./prisma/dev.db}"
+: "${DATABASE_URL:?DATABASE_URL must be set, e.g. file:/app/data/prod.db}"
+export DATABASE_URL
 
-# Run Prisma migrations using pnpm dlx (config file is copied from builder)
-echo "🔄 Running Prisma migrations..."
-pnpm dlx prisma migrate deploy 2>/dev/null || pnpm dlx prisma db push --accept-data-loss
+echo "🔄 Running Prisma migrations against ${DATABASE_URL}..."
+prisma --version
+
+# ponytail: single retry, add backoff if boot-time SQLite lock contention shows up in logs
+if ! prisma migrate deploy; then
+  echo "⚠️  migrate deploy failed, retrying once in 2s..." >&2
+  sleep 2
+  prisma migrate deploy
+fi || {
+  echo "❌ Prisma migrations failed for ${DATABASE_URL}" >&2
+  echo "--- diagnostics ---" >&2
+  prisma migrate status >&2 || true
+  ls -ld /app/data >&2 || true
+  exit 1
+}
 
 echo "✅ Database ready!"
 
-# Execute the main command
 exec "$@"

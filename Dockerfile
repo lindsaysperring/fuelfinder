@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for Next.js with Prisma
 # Uses pnpm and Next.js standalone output for optimal image size
-# Prisma client is generated at runtime using 'pnpm dlx' to avoid copying all node_modules
+# Prisma client is generated at build; migrations use a pinned CLI installed in the runner
 
 # Stage 1: Dependencies
 FROM node:22-alpine AS deps
@@ -50,11 +50,25 @@ ENV NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
 # Build the application
 RUN pnpm build
 
-# Stage 3: Runner
+# Stage 3: Prisma CLI (runs in parallel with the builder via BuildKit)
+# Pinned CLI in an isolated prefix. Version is read from package.json: one
+# source of truth, no ARG to forget. No --ignore-scripts: the schema engine
+# must download at build time. prisma --version fails the build instead of
+# shipping a broken image.
+FROM node:22-alpine AS prisma-cli
+RUN apk add --no-cache libc6-compat openssl
+COPY package.json ./
+RUN PRISMA_SPEC=$(node -p "require('./package.json').dependencies.prisma") && \
+    DOTENV_SPEC=$(node -p "require('./package.json').dependencies.dotenv") && \
+    npm install --prefix /opt/prisma-cli --no-package-lock "prisma@${PRISMA_SPEC}" "dotenv@${DOTENV_SPEC}" && \
+    ln -s /opt/prisma-cli/node_modules/.bin/prisma /usr/local/bin/prisma && \
+    prisma --version
+
+# Stage 4: Runner
 FROM node:22-alpine AS runner
 
-# Install dependencies and pnpm
-RUN apk add --no-cache openssl && \
+# Install pnpm (libc6-compat: schema engine binary needs it on musl)
+RUN apk add --no-cache openssl libc6-compat && \
     corepack enable && \
     corepack prepare pnpm@11.5.0 --activate
 
@@ -92,7 +106,16 @@ COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/src/generated ./src/generated
 COPY --from=builder /app/package.json ./package.json
 
-# Note: Prisma client is already generated and copied, migrations will use prisma.config.ts
+# Pinned Prisma CLI from the prisma-cli stage, symlinked into /app/node_modules
+# so /app/prisma.config.ts can resolve `prisma/config` and `dotenv/config`.
+COPY --from=prisma-cli /opt/prisma-cli /opt/prisma-cli
+RUN ln -s /opt/prisma-cli/node_modules/prisma /app/node_modules/prisma && \
+    ln -s /opt/prisma-cli/node_modules/dotenv /app/node_modules/dotenv && \
+    ln -s /opt/prisma-cli/node_modules/.bin/prisma /usr/local/bin/prisma
+
+ENV CHECKPOINT_DISABLE=1
+
+# Note: Prisma client is already generated and copied, migrations use the pinned CLI above
 
 # Copy startup script
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
